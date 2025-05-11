@@ -36,6 +36,22 @@ class MhdBaCard extends HTMLElement {
             var header = document.createElement('div');
             header.className = "card-header";
             header.appendChild(document.createTextNode(this.title));
+
+            // Add click handler to open entity detail dialog when header is clicked
+            if (this._primaryEntity) {
+                header.style.cursor = "pointer";
+                header.addEventListener('click', () => {
+                    const event = new CustomEvent('hass-more-info', {
+                        detail: {
+                            entityId: this._primaryEntity
+                        },
+                        bubbles: true,
+                        composed: true
+                    });
+                    this.dispatchEvent(event);
+                });
+            }
+
             card.appendChild(header);
 
             this.tableDiv = document.createElement('div');
@@ -119,7 +135,18 @@ class MhdBaCard extends HTMLElement {
             return [];
         }
 
-        return entityData.attributes["departures"];
+        // Make a copy of the departures array and sort it by departure_calculated
+        const departures = [...entityData.attributes["departures"]];
+        departures.sort((a, b) => {
+            // If departure_calculated is available, use it for sorting
+            if (a.departure_calculated !== undefined && b.departure_calculated !== undefined) {
+                return a.departure_calculated - b.departure_calculated;
+            }
+            // Fall back to planed_departure if departure_calculated is not available
+            return a.planed_departure - b.planed_departure;
+        });
+
+        return departures;
     }
 
 	async getCardSize() {
@@ -141,16 +168,19 @@ class MhdBaCard extends HTMLElement {
         var lineHeader = document.createElement('th');
         lineHeader.appendChild(document.createTextNode('Line'));
         lineHeader.style.fontWeight = "bold";
+        lineHeader.style.textAlign = "left";
         headerRow.appendChild(lineHeader);
 
         var destinationHeader = document.createElement('th');
         destinationHeader.appendChild(document.createTextNode('Destination'));
         destinationHeader.style.fontWeight = "bold";
+        destinationHeader.style.textAlign = "left";
         headerRow.appendChild(destinationHeader);
 
         var departuresHeader = document.createElement('th');
         departuresHeader.appendChild(document.createTextNode('Departure in'));
         departuresHeader.style.fontWeight = "bold";
+        departuresHeader.style.textAlign = "right";
         headerRow.appendChild(departuresHeader);
 
         thead.appendChild(headerRow);
@@ -189,7 +219,9 @@ class MhdBaCard extends HTMLElement {
             td3.appendChild(document.createTextNode(dataRow.destination));
             tr.appendChild(td3);
 
-            td2.appendChild(document.createTextNode(dataRow.minutes_until_departure + " min"));
+            let departureInMinutes = dataRow.minutes_until_departure <= 0 ? "Now" : dataRow.minutes_until_departure + " min";
+            td2.appendChild(document.createTextNode(departureInMinutes));
+            td2.style.textAlign = "right";
             tr.appendChild(td2);
 
             this.tableBody.appendChild(tr);
