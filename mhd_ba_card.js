@@ -209,6 +209,7 @@ class MhdBaCardEditor extends HTMLElement {
 
     setConfig(config) {
         this._config = { ...config };
+        this.render();
     }
 
     // The height of your card editor. Home Assistant uses this to automatically
@@ -231,32 +232,72 @@ class MhdBaCardEditor extends HTMLElement {
         wrapper.id = 'editor';
         wrapper.style.padding = '8px';
 
-        // Title input
-        wrapper.innerHTML = `
-            <div class="row">
-                <ha-textfield
-                    label="Title"
-                    .value="${this._config.title || ''}"
-                    .configValue="${'title'}"
-                    @input="${this._valueChanged}"
-                    style="width: 100%;"
-                ></ha-textfield>
-            </div>
-            <div class="row" style="margin-top: 16px;">
-                <ha-entity-picker
-                    label="Entity"
-                    .hass="${this._hass}"
-                    .value="${this._config.entity || ''}"
-                    .configValue="${'entity'}"
-                    @value-changed="${this._valueChanged}"
-                    .includeDomains="${['sensor']}"
-                    allow-custom-entity
-                    style="width: 100%;"
-                ></ha-entity-picker>
-            </div>
-        `;
+        // Add script to load necessary frontend components
+        if (!customElements.get('ha-entity-picker')) {
+            const script = document.createElement('script');
+            script.src = '/frontend_latest/panel-config.js';
+            document.head.appendChild(script);
+        }
+
+        // Create title field
+        const titleField = document.createElement('ha-textfield');
+        titleField.label = "Title";
+        titleField.value = this._config.title || '';
+        titleField.configValue = 'title';
+        titleField.style.display = 'block';
+        titleField.style.width = '100%';
+        titleField.style.marginBottom = '16px';
+        titleField.addEventListener('input', this._valueChanged.bind(this));
+
+        // Create the entity picker separately
+        const entityRow = document.createElement('div');
+        entityRow.className = 'row';
+        entityRow.style.marginTop = '16px';
+
+        // Wait for entity picker to be defined
+        this._createEntityPicker(entityRow);
+
+        // Add elements to wrapper
+        wrapper.appendChild(titleField);
+        wrapper.appendChild(entityRow);
 
         this.shadowRoot.appendChild(wrapper);
+    }
+
+    async _createEntityPicker(container) {
+        // Try to ensure the entity picker component is loaded
+        if (!customElements.get('ha-entity-picker')) {
+            // Wait a moment for components to load if they were just requested
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (customElements.get('ha-entity-picker')) {
+            const entityPicker = document.createElement('ha-entity-picker');
+            entityPicker.label = "Entity";
+            entityPicker.value = this._config.entity || '';
+            entityPicker.configValue = 'entity';
+            entityPicker.includeDomains = ['sensor'];
+            entityPicker.allowCustomEntity = true;
+            entityPicker.style.display = 'block';
+            entityPicker.style.width = '100%';
+
+            if (this._hass) {
+                entityPicker.hass = this._hass;
+            }
+
+            entityPicker.addEventListener('value-changed', this._valueChanged.bind(this));
+            container.appendChild(entityPicker);
+        } else {
+            // Fallback to a simple input if entity picker doesn't load
+            const input = document.createElement('ha-textfield');
+            input.label = "Entity ID";
+            input.value = this._config.entity || '';
+            input.configValue = 'entity';
+            input.style.display = 'block';
+            input.style.width = '100%';
+            input.addEventListener('input', this._valueChanged.bind(this));
+            container.appendChild(input);
+        }
     }
 
     _valueChanged(ev) {
