@@ -219,9 +219,24 @@ class MhdBaCard extends HTMLElement {
             td3.appendChild(document.createTextNode(dataRow.destination));
             tr.appendChild(td3);
 
+            td2.style.textAlign = "right";
+
+            // Add departure time with smaller font if available
+            if (dataRow.calculated_departure_formatted && dataRow.minutes_until_departure > 0) {
+                const timeSpan = document.createElement('span');
+                timeSpan.style.fontSize = '0.8em';
+                timeSpan.style.color = 'var(--secondary-text-color)';
+                timeSpan.style.marginRight = '10px';
+                timeSpan.appendChild(document.createTextNode(dataRow.calculated_departure_formatted));
+                td2.appendChild(timeSpan);
+
+            }
+            console.log("formated" + dataRow.calculated_departure_formatted);
+
+            // Add departure in minutes
             let departureInMinutes = dataRow.minutes_until_departure <= 0 ? "Now" : dataRow.minutes_until_departure + " min";
             td2.appendChild(document.createTextNode(departureInMinutes));
-            td2.style.textAlign = "right";
+
             tr.appendChild(td2);
 
             this.tableBody.appendChild(tr);
