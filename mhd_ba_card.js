@@ -242,6 +242,14 @@ class MhdBaCardEditor extends HTMLElement {
     render() {
         if (!this.shadowRoot) return;
 
+        if(this.shadowRoot.querySelector("ha-form")) {
+            // If the form already exists, just update it
+            const form = this.shadowRoot.querySelector("ha-form");
+            form.data = this._config;
+            form.schema = this._schema;
+            return;
+        }
+
         // Clear shadowRoot content
         while (this.shadowRoot.lastChild) {
             this.shadowRoot.removeChild(this.shadowRoot.lastChild);
@@ -253,6 +261,7 @@ class MhdBaCardEditor extends HTMLElement {
         if (this._hass) {
             form.hass = this._hass;
         }
+
         form.schema = this._schema;
         form.data = this._config;
         form.computeLabel = (schema) => schema.name.charAt(0).toUpperCase() + schema.name.slice(1);
