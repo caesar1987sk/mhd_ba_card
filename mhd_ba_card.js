@@ -205,203 +205,99 @@ class MhdBaCardEditor extends HTMLElement {
         };
         this._hass = null;
         this.attachShadow({ mode: 'open' });
-        this._rendered = false;
     }
 
     setConfig(config) {
-        // Store the config - this is called by Lovelace when editing an existing card
         this._config = { ...config };
-
-        if (this._rendered) {
-            // If already rendered, just update field values
-            this._updateFieldValues();
-        } else {
-            // Otherwise do initial render
-            this.render();
-        }
+        this._configChanged = false;
+        this.render();
     }
 
-    get editor() {
-        return this.shadowRoot.getElementById('editor');
+    // Define the schema for ha-form
+    get _schema() {
+        return [
+            {
+                name: "Title",
+                selector: {
+                    text: {}
+                },
+            },
+            {
+                name: "Entity",
+                selector: {
+                    entity: {
+                        domain: ["sensor"]
+                    }
+                },
+            },
+        ];
     }
 
     render() {
         if (!this.shadowRoot) return;
 
-        // Only create the UI once to prevent focus loss
-        if (this._rendered) {
-            this._updateFieldValues();
-            return;
+        // Clear shadowRoot content
+        while (this.shadowRoot.lastChild) {
+            this.shadowRoot.removeChild(this.shadowRoot.lastChild);
         }
 
-        // Create editor wrapper
-        const wrapper = document.createElement('div');
-        wrapper.id = 'editor';
-        wrapper.style.padding = '8px';
+        // Create the form - ha-form handles rendering of all inputs based on schema
+        const form = document.createElement("ha-form");
+        form.hass = this._hass
+        form.schema = this._schema;
+        form.data = this._config;
+        form.computeLabel = (schema) => schema.name;
 
-        // Create title field
-        const titleField = document.createElement('ha-textfield');
-        titleField.id = 'title-field';
-        titleField.label = "Title";
-        titleField.value = this._config.title || '';
-        titleField.configValue = 'title';
-        titleField.style.display = 'block';
-        titleField.style.width = '100%';
-        titleField.style.marginBottom = '16px';
-        titleField.addEventListener('input', this._valueChanged.bind(this));
-        wrapper.appendChild(titleField);
-
-        // Create entity field - use a dropdown
-        const entityRow = document.createElement('div');
-        entityRow.className = 'row';
-        entityRow.style.marginTop = '16px';
-
-        // Create entity selector
-        const entitySelect = document.createElement('select');
-        entitySelect.id = 'entity-field';
-        entitySelect.style.display = 'block';
-        entitySelect.style.width = '100%';
-        entitySelect.style.height = '40px';
-        entitySelect.configValue = 'entity';
-        entitySelect.addEventListener('change', this._valueChanged.bind(this));
-
-        // Add a label
-        const entityLabel = document.createElement('div');
-        entityLabel.textContent = 'Entity';
-        entityLabel.style.marginBottom = '8px';
-        entityLabel.style.fontWeight = 'bold';
-
-        entityRow.appendChild(entityLabel);
-        entityRow.appendChild(entitySelect);
-
-        // Add help text
-        const helpText = document.createElement('div');
-        helpText.style.color = 'var(--secondary-text-color)';
-        helpText.style.fontSize = '12px';
-        helpText.style.marginTop = '4px';
-        helpText.textContent = 'Select the sensor entity for MHD BA departures';
-        entityRow.appendChild(helpText);
-
-        wrapper.appendChild(entityRow);
-        this.shadowRoot.appendChild(wrapper);
-
-        this._rendered = true;
-
-        // If we have hass data, populate the entity dropdown
-        if (this._hass) {
-            this._updateEntityList();
-        }
-
-        // Make sure fields are initialized with current values
-        this._updateFieldValues();
-    }
-
-    _updateEntityList() {
-        const entitySelect = this.shadowRoot.getElementById('entity-field');
-        if (!entitySelect || !this._hass) return;
-
-        // Clear existing options
-        while (entitySelect.firstChild) {
-            entitySelect.removeChild(entitySelect.firstChild);
-        }
-
-        // Add empty option
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = '-- Select sensor --';
-        entitySelect.appendChild(emptyOption);
-
-        // Get all sensor entities
-        const sensorEntities = Object.keys(this._hass.states)
-            .filter(entityId => entityId.startsWith('sensor.'))
-            .sort();
-
-        // Add options for each sensor entity
-        for (const entityId of sensorEntities) {
-            const option = document.createElement('option');
-            option.value = entityId;
-
-            // Get friendly name if available
-            const entity = this._hass.states[entityId];
-            const friendlyName = entity.attributes && entity.attributes.friendly_name
-                ? entity.attributes.friendly_name
-                : entityId;
-
-            option.textContent = `${friendlyName} (${entityId})`;
-            entitySelect.appendChild(option);
-        }
-    }
-
-    _updateFieldValues() {
-        // Update field values without recreating the DOM elements
-        const titleField = this.shadowRoot.getElementById('title-field');
-        const entityField = this.shadowRoot.getElementById('entity-field');
-
-        if (titleField) {
-            titleField.value = this._config.title || '';
-        }
-
-        if (entityField) {
-            // Update the selected entity in dropdown
-            const selectedEntityId = this._config.entity || '';
-
-            // First ensure we have all entity options
-            if (this._hass && entityField.tagName === 'SELECT') {
-                // Only repopulate if needed
-                if (entityField.options.length <= 1) {
-                    this._updateEntityList();
-                }
-
-                // Set the selected option
-                for (let i = 0; i < entityField.options.length; i++) {
-                    if (entityField.options[i].value === selectedEntityId) {
-                        entityField.selectedIndex = i;
-                        break;
-                    }
-                }
+        // Listen for value changes
+        form.addEventListener("value-changed", (ev) => {
+            if (!this._config || !this.shadowRoot || !ev.detail || !ev.detail.value) {
+                return;
             }
-        }
+
+            // Update the config
+            this._config = ev.detail.value;
+
+            // Notify Lovelace of the changed config
+            this._configChanged = true;
+            this._fireEvent();
+        });
+
+        // Add a help text below the form
+        const helpText = document.createElement("div");
+        helpText.style.color = "var(--secondary-text-color)";
+        helpText.style.padding = "8px 0";
+        helpText.style.fontSize = "12px";
+        helpText.textContent = "Select the sensor entity that provides MHD BA departures data";
+
+        // Add form and helptext to shadowRoot
+        const container = document.createElement("div");
+        container.style.padding = "8px";
+        container.appendChild(form);
+        container.appendChild(helpText);
+
+        this.shadowRoot.appendChild(container);
     }
 
-    _valueChanged(ev) {
-        if (!this._config || !this.shadowRoot) return;
-
-        const target = ev.target;
-        const configValue = target.configValue;
-
-        if (!configValue) return;
-
-        // Update the config without triggering a render
-        this._config = {
-            ...this._config,
-            [configValue]: target.value
-        };
+    _fireEvent() {
+        if (!this._configChanged) return;
 
         // Notify Lovelace of the changed config
-        const event = new CustomEvent('config-changed', {
+        const event = new CustomEvent("config-changed", {
             detail: { config: this._config },
             bubbles: true,
             composed: true,
         });
         this.dispatchEvent(event);
+        this._configChanged = false;
     }
 
     set hass(hass) {
         this._hass = hass;
 
-        // Update entity list when hass is updated
-        if (this._rendered) {
-            this._updateEntityList();
-            this._updateFieldValues();
-        } else {
-            // Initial render if not done yet
-            this.render();
-        }
-    }
-
-    connectedCallback() {
-        if (!this._rendered) {
-            this.render();
+        // Pass hass to ha-form if it exists
+        const form = this.shadowRoot?.querySelector("ha-form");
+        if (form) {
+            form.hass = hass;
         }
     }
 }
