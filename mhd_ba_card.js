@@ -17,6 +17,11 @@ class MhdBaCard extends HTMLElement {
 		};
 	}
 
+    // Add getter to expose this._hass as this.hass
+    get hass() {
+        return this._hass;
+    }
+
     set hass(hass) {
         this._hass = hass;
 
@@ -204,6 +209,7 @@ class MhdBaCardEditor extends HTMLElement {
             title: null
         };
         this._hass = null;
+        this._debounceTimeout = null;
         this.attachShadow({ mode: 'open' });
     }
 
@@ -217,13 +223,13 @@ class MhdBaCardEditor extends HTMLElement {
     get _schema() {
         return [
             {
-                name: "Title",
+                name: "title",
                 selector: {
                     text: {}
                 },
             },
             {
-                name: "Entity",
+                name: "entity",
                 selector: {
                     entity: {
                         domain: ["sensor"]
@@ -243,10 +249,13 @@ class MhdBaCardEditor extends HTMLElement {
 
         // Create the form - ha-form handles rendering of all inputs based on schema
         const form = document.createElement("ha-form");
-        form.hass = this._hass
+        // Make sure we set hass before setting other properties
+        if (this._hass) {
+            form.hass = this._hass;
+        }
         form.schema = this._schema;
         form.data = this._config;
-        form.computeLabel = (schema) => schema.name;
+        form.computeLabel = (schema) => schema.name.charAt(0).toUpperCase() + schema.name.slice(1);
 
         // Listen for value changes
         form.addEventListener("value-changed", (ev) => {
@@ -257,9 +266,16 @@ class MhdBaCardEditor extends HTMLElement {
             // Update the config
             this._config = ev.detail.value;
 
-            // Notify Lovelace of the changed config
-            this._configChanged = true;
-            this._fireEvent();
+            // Use debouncing to prevent re-rendering on each keystroke
+            if (this._debounceTimeout) {
+                clearTimeout(this._debounceTimeout);
+            }
+
+            this._debounceTimeout = setTimeout(() => {
+                // Notify Lovelace of the changed config
+                this._configChanged = true;
+                this._fireEvent();
+            }, 500); // Wait 500ms before updating
         });
 
         // Add a help text below the form
