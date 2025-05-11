@@ -23,8 +23,6 @@ class MhdBaCard extends HTMLElement {
         if ((this.title === null || this.title === ''|| this.title === 'null') && this._primaryEntity && hass.states[this._primaryEntity]) {
             this.title = hass.states[this._primaryEntity].attributes.friendly_name || this._primaryEntity;
         }
-        console.log(hass.states[this._primaryEntity].attributes.friendly_name);
-        console.log(this.title);
 
         if (!this.tableDiv) {
             const card = document.createElement('ha-card');
@@ -196,7 +194,7 @@ class MhdBaCard extends HTMLElement {
 // Define the card editor
 customElements.define('mhd-ba-card', MhdBaCard);
 
-// Editor using lit-element for better compatibility
+// Editor implementation for the custom card
 class MhdBaCardEditor extends HTMLElement {
     constructor() {
         super();
@@ -205,16 +203,17 @@ class MhdBaCardEditor extends HTMLElement {
             title: null
         };
         this.attachShadow({ mode: 'open' });
+        this._rendered = false;
     }
 
     setConfig(config) {
         this._config = { ...config };
-        this.render();
+        // Only render if not already rendered to avoid re-rendering during initialization
+        if (!this._rendered) {
+            this.render();
+        }
     }
 
-    // The height of your card editor. Home Assistant uses this to automatically
-    // adjust UI height. Use this if you have UI elements outside the standard
-    // card size. Usually, leave it undefined.
     get editor() {
         return this.shadowRoot.getElementById('editor');
     }
@@ -222,9 +221,10 @@ class MhdBaCardEditor extends HTMLElement {
     render() {
         if (!this.shadowRoot) return;
 
-        // Handle the case where the editor is already rendered
-        if (this.shadowRoot.lastChild) {
-            this.shadowRoot.removeChild(this.shadowRoot.lastChild);
+        // Only create the UI once to prevent focus loss
+        if (this._rendered) {
+            this._updateFieldValues();
+            return;
         }
 
         // Create editor wrapper
@@ -232,15 +232,9 @@ class MhdBaCardEditor extends HTMLElement {
         wrapper.id = 'editor';
         wrapper.style.padding = '8px';
 
-        // Add script to load necessary frontend components
-        if (!customElements.get('ha-entity-picker')) {
-            const script = document.createElement('script');
-            script.src = '/frontend_latest/panel-config.js';
-            document.head.appendChild(script);
-        }
-
         // Create title field
         const titleField = document.createElement('ha-textfield');
+        titleField.id = 'title-field';
         titleField.label = "Title";
         titleField.value = this._config.title || '';
         titleField.configValue = 'title';
@@ -248,55 +242,50 @@ class MhdBaCardEditor extends HTMLElement {
         titleField.style.width = '100%';
         titleField.style.marginBottom = '16px';
         titleField.addEventListener('input', this._valueChanged.bind(this));
+        wrapper.appendChild(titleField);
 
-        // Create the entity picker separately
+        // Create entity field - use a simple text input
         const entityRow = document.createElement('div');
         entityRow.className = 'row';
         entityRow.style.marginTop = '16px';
 
-        // Wait for entity picker to be defined
-        this._createEntityPicker(entityRow);
+        const textField = document.createElement('ha-textfield');
+        textField.id = 'entity-field';
+        textField.label = "Entity ID";
+        textField.placeholder = "sensor.mhd_ba_departures";
+        textField.value = this._config.entity || '';
+        textField.configValue = 'entity';
+        textField.style.display = 'block';
+        textField.style.width = '100%';
+        textField.addEventListener('input', this._valueChanged.bind(this));
 
-        // Add elements to wrapper
-        wrapper.appendChild(titleField);
+        entityRow.appendChild(textField);
+
+        // Add help text
+        const helpText = document.createElement('div');
+        helpText.style.color = 'var(--secondary-text-color)';
+        helpText.style.fontSize = '12px';
+        helpText.style.marginTop = '4px';
+        helpText.textContent = 'Enter the entity ID of your MHD BA sensor';
+        entityRow.appendChild(helpText);
+
         wrapper.appendChild(entityRow);
-
         this.shadowRoot.appendChild(wrapper);
+
+        this._rendered = true;
     }
 
-    async _createEntityPicker(container) {
-        // Try to ensure the entity picker component is loaded
-        if (!customElements.get('ha-entity-picker')) {
-            // Wait a moment for components to load if they were just requested
-            await new Promise(resolve => setTimeout(resolve, 100));
+    _updateFieldValues() {
+        // Update field values without recreating the DOM elements
+        const titleField = this.shadowRoot.getElementById('title-field');
+        const entityField = this.shadowRoot.getElementById('entity-field');
+
+        if (titleField) {
+            titleField.value = this._config.title || '';
         }
 
-        if (customElements.get('ha-entity-picker')) {
-            const entityPicker = document.createElement('ha-entity-picker');
-            entityPicker.label = "Entity";
-            entityPicker.value = this._config.entity || '';
-            entityPicker.configValue = 'entity';
-            entityPicker.includeDomains = ['sensor'];
-            entityPicker.allowCustomEntity = true;
-            entityPicker.style.display = 'block';
-            entityPicker.style.width = '100%';
-
-            if (this._hass) {
-                entityPicker.hass = this._hass;
-            }
-
-            entityPicker.addEventListener('value-changed', this._valueChanged.bind(this));
-            container.appendChild(entityPicker);
-        } else {
-            // Fallback to a simple input if entity picker doesn't load
-            const input = document.createElement('ha-textfield');
-            input.label = "Entity ID";
-            input.value = this._config.entity || '';
-            input.configValue = 'entity';
-            input.style.display = 'block';
-            input.style.width = '100%';
-            input.addEventListener('input', this._valueChanged.bind(this));
-            container.appendChild(input);
+        if (entityField) {
+            entityField.value = this._config.entity || '';
         }
     }
 
@@ -308,18 +297,11 @@ class MhdBaCardEditor extends HTMLElement {
 
         if (!configValue) return;
 
-        // Handle different ways an entity picker can report a change
-        if (configValue === 'entity' && ev.type === 'value-changed') {
-            this._config = {
-                ...this._config,
-                [configValue]: ev.detail.value
-            };
-        } else {
-            this._config = {
-                ...this._config,
-                [configValue]: target.value
-            };
-        }
+        // Update the config without triggering a render
+        this._config = {
+            ...this._config,
+            [configValue]: target.value
+        };
 
         // Notify Lovelace of the changed config
         const event = new CustomEvent('config-changed', {
@@ -330,15 +312,15 @@ class MhdBaCardEditor extends HTMLElement {
         this.dispatchEvent(event);
     }
 
-    // This gets called when the card editor is first loaded or when the hass state changes
     set hass(hass) {
         this._hass = hass;
-        this.render();
+        // Don't trigger a render when hass changes
     }
 
-    // This gets called after connectedCallback when the element is added to the DOM
     connectedCallback() {
-        this.render();
+        if (!this._rendered) {
+            this.render();
+        }
     }
 }
 
