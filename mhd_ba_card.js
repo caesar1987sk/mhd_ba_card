@@ -203,6 +203,7 @@ class MhdBaCardEditor extends HTMLElement {
             entity: '',
             title: null
         };
+        this._hass = null;
         this.attachShadow({ mode: 'open' });
         this._rendered = false;
     }
@@ -250,29 +251,35 @@ class MhdBaCardEditor extends HTMLElement {
         titleField.addEventListener('input', this._valueChanged.bind(this));
         wrapper.appendChild(titleField);
 
-        // Create entity field - use a simple text input
+        // Create entity field - use a dropdown
         const entityRow = document.createElement('div');
         entityRow.className = 'row';
         entityRow.style.marginTop = '16px';
 
-        const textField = document.createElement('ha-textfield');
-        textField.id = 'entity-field';
-        textField.label = "Entity ID";
-        textField.placeholder = "sensor.mhd_ba_departures";
-        textField.value = this._config.entity || '';
-        textField.configValue = 'entity';
-        textField.style.display = 'block';
-        textField.style.width = '100%';
-        textField.addEventListener('input', this._valueChanged.bind(this));
+        // Create entity selector
+        const entitySelect = document.createElement('select');
+        entitySelect.id = 'entity-field';
+        entitySelect.style.display = 'block';
+        entitySelect.style.width = '100%';
+        entitySelect.style.height = '40px';
+        entitySelect.configValue = 'entity';
+        entitySelect.addEventListener('change', this._valueChanged.bind(this));
 
-        entityRow.appendChild(textField);
+        // Add a label
+        const entityLabel = document.createElement('div');
+        entityLabel.textContent = 'Entity';
+        entityLabel.style.marginBottom = '8px';
+        entityLabel.style.fontWeight = 'bold';
+
+        entityRow.appendChild(entityLabel);
+        entityRow.appendChild(entitySelect);
 
         // Add help text
         const helpText = document.createElement('div');
         helpText.style.color = 'var(--secondary-text-color)';
         helpText.style.fontSize = '12px';
         helpText.style.marginTop = '4px';
-        helpText.textContent = 'Enter the entity ID of your MHD BA sensor';
+        helpText.textContent = 'Select the sensor entity for MHD BA departures';
         entityRow.appendChild(helpText);
 
         wrapper.appendChild(entityRow);
@@ -280,8 +287,49 @@ class MhdBaCardEditor extends HTMLElement {
 
         this._rendered = true;
 
+        // If we have hass data, populate the entity dropdown
+        if (this._hass) {
+            this._updateEntityList();
+        }
+
         // Make sure fields are initialized with current values
         this._updateFieldValues();
+    }
+
+    _updateEntityList() {
+        const entitySelect = this.shadowRoot.getElementById('entity-field');
+        if (!entitySelect || !this._hass) return;
+
+        // Clear existing options
+        while (entitySelect.firstChild) {
+            entitySelect.removeChild(entitySelect.firstChild);
+        }
+
+        // Add empty option
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '-- Select sensor --';
+        entitySelect.appendChild(emptyOption);
+
+        // Get all sensor entities
+        const sensorEntities = Object.keys(this._hass.states)
+            .filter(entityId => entityId.startsWith('sensor.'))
+            .sort();
+
+        // Add options for each sensor entity
+        for (const entityId of sensorEntities) {
+            const option = document.createElement('option');
+            option.value = entityId;
+
+            // Get friendly name if available
+            const entity = this._hass.states[entityId];
+            const friendlyName = entity.attributes && entity.attributes.friendly_name
+                ? entity.attributes.friendly_name
+                : entityId;
+
+            option.textContent = `${friendlyName} (${entityId})`;
+            entitySelect.appendChild(option);
+        }
     }
 
     _updateFieldValues() {
@@ -294,7 +342,24 @@ class MhdBaCardEditor extends HTMLElement {
         }
 
         if (entityField) {
-            entityField.value = this._config.entity || '';
+            // Update the selected entity in dropdown
+            const selectedEntityId = this._config.entity || '';
+
+            // First ensure we have all entity options
+            if (this._hass && entityField.tagName === 'SELECT') {
+                // Only repopulate if needed
+                if (entityField.options.length <= 1) {
+                    this._updateEntityList();
+                }
+
+                // Set the selected option
+                for (let i = 0; i < entityField.options.length; i++) {
+                    if (entityField.options[i].value === selectedEntityId) {
+                        entityField.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -323,7 +388,15 @@ class MhdBaCardEditor extends HTMLElement {
 
     set hass(hass) {
         this._hass = hass;
-        // Don't trigger a render when hass changes
+
+        // Update entity list when hass is updated
+        if (this._rendered) {
+            this._updateEntityList();
+            this._updateFieldValues();
+        } else {
+            // Initial render if not done yet
+            this.render();
+        }
     }
 
     connectedCallback() {
