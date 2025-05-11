@@ -144,7 +144,7 @@ class MhdBaCard extends HTMLElement {
         headerRow.appendChild(destinationHeader);
 
         var departuresHeader = document.createElement('th');
-        departuresHeader.appendChild(document.createTextNode('Departures'));
+        departuresHeader.appendChild(document.createTextNode('Departure in'));
         departuresHeader.style.fontWeight = "bold";
         headerRow.appendChild(departuresHeader);
 
@@ -184,7 +184,7 @@ class MhdBaCard extends HTMLElement {
             td3.appendChild(document.createTextNode(dataRow.destination));
             tr.appendChild(td3);
 
-            td2.appendChild(document.createTextNode(dataRow.calculated_departure_formatted));
+            td2.appendChild(document.createTextNode(dataRow.minutes_until_departure + " min"));
             tr.appendChild(td2);
 
             this.tableBody.appendChild(tr);
