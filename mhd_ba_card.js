@@ -5,7 +5,8 @@ class MhdBaCard extends HTMLElement {
 
 	// Return the card editor for configuration in the UI
 	static getConfigElement() {
-		return document.createElement('mhd-ba-card-editor');
+		const editor = document.createElement('mhd-ba-card-editor');
+		return editor;
 	}
 
 	// Return the card configuration element for validation
@@ -207,9 +208,14 @@ class MhdBaCardEditor extends HTMLElement {
     }
 
     setConfig(config) {
+        // Store the config - this is called by Lovelace when editing an existing card
         this._config = { ...config };
-        // Only render if not already rendered to avoid re-rendering during initialization
-        if (!this._rendered) {
+
+        if (this._rendered) {
+            // If already rendered, just update field values
+            this._updateFieldValues();
+        } else {
+            // Otherwise do initial render
             this.render();
         }
     }
@@ -273,6 +279,9 @@ class MhdBaCardEditor extends HTMLElement {
         this.shadowRoot.appendChild(wrapper);
 
         this._rendered = true;
+
+        // Make sure fields are initialized with current values
+        this._updateFieldValues();
     }
 
     _updateFieldValues() {
@@ -324,6 +333,7 @@ class MhdBaCardEditor extends HTMLElement {
     }
 }
 
+// Register the editor component BEFORE the card component registers with customCards
 customElements.define('mhd-ba-card-editor', MhdBaCardEditor);
 
 // Register card with Lovelace
