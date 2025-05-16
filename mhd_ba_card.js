@@ -159,7 +159,8 @@ class MhdBaCard extends HTMLElement {
         var tbl = document.createElement('table');
         tbl.style.width = '100%';
         tbl.style.padding = '10px';
-        tbl.setAttribute('border', '0');
+        tbl.style.border = '0';
+
 
         // Create table header
         var thead = document.createElement('thead');
@@ -177,10 +178,16 @@ class MhdBaCard extends HTMLElement {
         destinationHeader.style.textAlign = "left";
         headerRow.appendChild(destinationHeader);
 
+        /*var delayHeader = document.createElement('th');
+        delayHeader.style.fontWeight = "normal";
+        delayHeader.appendChild(document.createTextNode('Delay'));
+        headerRow.appendChild(delayHeader);*/
+
         var departuresHeader = document.createElement('th');
-        departuresHeader.appendChild(document.createTextNode('Departure in'));
+        departuresHeader.appendChild(document.createTextNode('Departure'));
         departuresHeader.style.fontWeight = "bold";
-        departuresHeader.style.textAlign = "right";
+        departuresHeader.style.textAlign = "center";
+        departuresHeader.colSpan = 2;
         headerRow.appendChild(departuresHeader);
 
         thead.appendChild(headerRow);
@@ -209,35 +216,71 @@ class MhdBaCard extends HTMLElement {
         this._itemCount = data.length;
         for (const dataRow of data) {
             var tr = document.createElement('tr');
-            var td1 = document.createElement('td');
-            var td2 = document.createElement('td');
-            var td3 = document.createElement('td');
+            var td_line = document.createElement('td');
+            var td_departure_in = document.createElement('td');
+            var td_departure_time = document.createElement('td');
+            var td_destination = document.createElement('td');
+            var td_destination = document.createElement('td');
+            //var td_delay = document.createElement('td');
 
-            td1.appendChild(document.createTextNode(dataRow.line));
-            tr.appendChild(td1);
+            // Create line number with styling
+            // TODO: add color based on line number?
+            // https://www.idsbk.sk/download/az1f004rx40d.pdf
+            // https://www.idsbk.sk/download/az1f003rx41d.pdf
+            const lineSpan = document.createElement('span');
+            lineSpan.style.position = 'relative';
+            lineSpan.style.padding = '.125em';
+            lineSpan.style.borderRadius = '0.25em';
+            lineSpan.style.display = 'inline-block';
+            lineSpan.style.minWidth = '1.84375em';
+            lineSpan.style.minHeight = '1.84375em';
+            lineSpan.style.height = '1.84375em';
+            lineSpan.style.fontSize = '0.875em';
+            lineSpan.style.backgroundColor = '#808080';
+            lineSpan.style.borderColor = '#808080';
+            lineSpan.style.textAlign = 'center';
+            lineSpan.style.color = '#fff';
+            lineSpan.style.fontWeight = 'bold';
 
-            td3.appendChild(document.createTextNode(dataRow.destination));
-            tr.appendChild(td3);
+            lineSpan.appendChild(document.createTextNode(dataRow.line));
+            td_line.appendChild(lineSpan);
+            tr.appendChild(td_line);
 
-            td2.style.textAlign = "right";
+            td_destination.appendChild(document.createTextNode(dataRow.destination));
+            tr.appendChild(td_destination);
 
+            /*// Add delay if available
+            const delaySpan = document.createElement('span');
+            if (dataRow.delay > 0) {
+
+                delaySpan.style.color = 'var(--secondary-text-color)';
+                delaySpan.style.fontSize = '0.8em';
+                delaySpan.style.color = '#ff0000';
+                delaySpan.appendChild(document.createTextNode(dataRow.delay + " min"));
+                td_delay.appendChild(delaySpan);
+            }
+            td_delay.appendChild(delaySpan);
+            tr.appendChild(td_delay);*/
+
+            td_departure_time.style.textAlign = "right";
+
+            const timeSpan = document.createElement('span');
             // Add departure time with smaller font if available
             if (dataRow.calculated_departure_formatted && dataRow.minutes_until_departure > 0) {
-                const timeSpan = document.createElement('span');
+
                 timeSpan.style.fontSize = '0.8em';
                 timeSpan.style.color = 'var(--secondary-text-color)';
-                timeSpan.style.marginRight = '10px';
                 timeSpan.appendChild(document.createTextNode(dataRow.calculated_departure_formatted));
-                td2.appendChild(timeSpan);
-
             }
-            console.log("formated" + dataRow.calculated_departure_formatted);
+            td_departure_time.appendChild(timeSpan);
 
             // Add departure in minutes
+            td_departure_in.style.textAlign = "right";
             let departureInMinutes = dataRow.minutes_until_departure <= 0 ? "Now" : dataRow.minutes_until_departure + " min";
-            td2.appendChild(document.createTextNode(departureInMinutes));
+            td_departure_in.appendChild(document.createTextNode(departureInMinutes));
 
-            tr.appendChild(td2);
+            tr.appendChild(td_departure_time);
+            tr.appendChild(td_departure_in);
 
             this.tableBody.appendChild(tr);
         }
