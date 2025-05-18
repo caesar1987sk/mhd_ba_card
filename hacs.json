@@ -1,0 +1,8 @@
+{
+    "name": "MHD BA Card",
+    "content_in_root": true,
+    "filename": "mhd_ba_card.js",
+    "render_readme": true,
+    "homeassistant": "2025.5.0",
+    "hacs": "2.0.5"
+}
