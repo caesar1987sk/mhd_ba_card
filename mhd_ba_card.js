@@ -115,14 +115,14 @@ class MhdBaCard extends HTMLElement {
       return [];
     }
 
-    // Make a copy of the departures array and sort it by departure_calculated
+    // Make a copy of the departures array and sort it by actual_departure
     const departures = [...entityData.attributes['departures']];
     departures.sort((a, b) => {
-      // If departure_calculated is available, use it for sorting
-      if (a.departure_calculated !== undefined && b.departure_calculated !== undefined) {
-        return a.departure_calculated - b.departure_calculated;
+      // If actual_departure is available, use it for sorting
+      if (a.actual_departure !== undefined && b.actual_departure !== undefined) {
+        return a.actual_departure - b.actual_departure;
       }
-      // Fall back to planed_departure if departure_calculated is not available
+      // Fall back to planed_departure if actual_departure is not available
       return a.planed_departure - b.planed_departure;
     });
 
@@ -226,17 +226,18 @@ class MhdBaCard extends HTMLElement {
 
       const timeSpan = document.createElement('span');
       // Add departure time with smaller font if available
-      if (dataRow.calculated_departure_formatted && dataRow.minutes_until_departure > 0) {
+      if (dataRow.actual_departure_formatted && dataRow.minutes_until_actual_departure > 0) {
         timeSpan.style.fontSize = '0.8em';
         timeSpan.style.color = 'var(--secondary-text-color)';
-        timeSpan.appendChild(document.createTextNode(dataRow.calculated_departure_formatted));
+        timeSpan.appendChild(document.createTextNode(dataRow.actual_departure_formatted));
       }
       td_departure_time.appendChild(timeSpan);
       tr.appendChild(td_departure_time);
 
       // Add departure in minutes
       td_departure_in.style.textAlign = 'right';
-      let departureInMinutes = dataRow.minutes_until_departure <= 0 ? 'Now' : dataRow.minutes_until_departure + ' min';
+      let departureInMinutes =
+        dataRow.minutes_until_actual_departure <= 0 ? 'Now' : dataRow.minutes_until_actual_departure + ' min';
       td_departure_in.appendChild(document.createTextNode(departureInMinutes));
 
       tr.appendChild(td_departure_in);
